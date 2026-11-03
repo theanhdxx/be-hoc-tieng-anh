@@ -1,0 +1,7 @@
+{
+  "appId": "vn.myh.kidsenglish",
+  "appName": "Bé Học Tiếng Anh",
+  "webDir": "www",
+  "android": { "allowMixedContent": false },
+  "plugins": { "CapacitorHttp": { "enabled": true } }
+}

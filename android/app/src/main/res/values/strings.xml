@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Bé Học Tiếng Anh</string>
+    <string name="title_activity_main">Bé Học Tiếng Anh</string>
+    <string name="package_name">vn.myh.kidsenglish</string>
+    <string name="custom_url_scheme">vn.myh.kidsenglish</string>
+</resources>
