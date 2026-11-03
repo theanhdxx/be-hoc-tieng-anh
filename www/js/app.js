@@ -832,5 +832,17 @@ SCREENS.settings = {
   Stage.render();
   await Promise.all([Voice.init(), Ears.init()]);
   history.replaceState({ name: 'home', params: {} }, '');
+  if (Native.isNative) { go('home', {}, false); return; }
+  // Bản web: trình duyệt chỉ cho phát tiếng sau khi chạm màn hình → nút Bắt đầu
   go('home', {}, false);
+  Voice.stop();
+  const ov = document.createElement('div');
+  ov.className = 'startov';
+  ov.innerHTML = `<button class="btn big primary" id="startBtn">▶️ Bắt đầu</button><div class="mic-label">Chạm để bật tiếng</div>`;
+  document.body.appendChild(ov);
+  $('#startBtn').onclick = () => {
+    Voice.unlock(); Sfx.unlock(); Sfx.pop();
+    ov.remove();
+    go('home', {}, false);
+  };
 })();

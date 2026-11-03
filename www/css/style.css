@@ -207,3 +207,7 @@ main.full .stage { display: none; }
 .choice .ce { font-size: 40px; margin-right: 8px; vertical-align: middle; }
 .choice.wrongc { background: #ffcdd2; }
 .picture.small { font-size: 72px; letter-spacing: 6px; max-width: 520px; line-height: 1.2; }
+
+/* Lớp phủ Bắt đầu (bản web) */
+.startov { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: center; background: rgba(191, 232, 255, .55); backdrop-filter: blur(3px); }
+.startov .btn { font-size: 40px; padding: 22px 48px; animation: pulse 1.4s infinite; }

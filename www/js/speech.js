@@ -30,21 +30,47 @@ const Voice = {
       return Native.TTS.speak({ text, lang, rate, pitch, volume: 1.0, category: 'playback' }).catch(() => {});
     }
     if (!('speechSynthesis' in window)) return wait(Math.min(4000, text.length * 70));
+    return this._webSpeak(text, lang, pitch, rate);
+  },
+  _keep: [],          // giữ tham chiếu để Chrome không "nuốt" câu đang đọc
+  _lastCancel: 0,
+  unlocked: false,
+  /* Gọi trong lúc người dùng chạm màn hình để trình duyệt cho phép phát tiếng */
+  unlock() {
+    if (Native.TTS || this.unlocked || !('speechSynthesis' in window)) return;
+    this.unlocked = true;
+    try {
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0; speechSynthesis.speak(u);
+    } catch (e) {}
+  },
+  async _webSpeak(text, lang, pitch, rate) {
+    const ss = window.speechSynthesis;
+    if (!this._webVoices.length) {           // chờ danh sách giọng nạp xong (Android cần vài trăm ms)
+      for (let i = 0; i < 10 && !ss.getVoices().length; i++) await wait(100);
+      this._webVoices = ss.getVoices();
+    }
+    if (ss.speaking || ss.pending) { ss.cancel(); this._lastCancel = Date.now(); }
+    const since = Date.now() - this._lastCancel;
+    if (since < 250) await wait(250 - since);  // lỗi của Chrome: đọc ngay sau khi dừng sẽ bị mất tiếng
+    try { ss.resume(); } catch (e) {}
     return new Promise(res => {
       const u = new SpeechSynthesisUtterance(text);
-      u.lang = lang; u.pitch = Math.min(2, pitch); u.rate = rate;
-      const v = this._webVoices.find(v => v.lang === lang) || this._webVoices.find(v => v.lang && v.lang.startsWith(lang.slice(0, 2)));
+      u.lang = lang; u.pitch = Math.min(2, pitch); u.rate = rate; u.volume = 1;
+      const v = this._webVoices.find(v => v.lang === lang) ||
+        this._webVoices.find(v => v.lang && v.lang.replace('_', '-').startsWith(lang.slice(0, 2)));
       if (v) u.voice = v;
+      this._keep.push(u); if (this._keep.length > 20) this._keep.shift();
       let done = false;
       const fin = () => { if (!done) { done = true; res(); } };
       u.onend = fin; u.onerror = fin;
       setTimeout(fin, 3000 + text.length * 150); // phòng khi trình duyệt không báo onend
-      speechSynthesis.speak(u);
+      ss.speak(u);
     });
   },
   stop() {
     if (Native.TTS) Native.TTS.stop().catch(() => {});
-    else if ('speechSynthesis' in window) speechSynthesis.cancel();
+    else if ('speechSynthesis' in window) { speechSynthesis.cancel(); this._lastCancel = Date.now(); }
   }
 };
 
