@@ -28,7 +28,7 @@ const Voice = {
     if (!text) return Promise.resolve();
     const vs = (typeof S !== 'undefined' && S.voice) || {};
     const isVi = lang.startsWith('vi');
-    if (isVi && vs.viEngine === 'fpt' && vs.fptKey && !opts.device) return FPT.speak(text).catch(() => this.speak(text, lang, pitch, rate, { device: true }));
+    if (isVi && !opts.device && FPT.ready()) return FPT.speak(text).catch(e => { console.warn('FPT:', e.message); return this.speak(text, lang, pitch, rate, { device: true }); });
     // Kiểu giọng: nữ / nam / trẻ em (chỉnh cao độ trên giọng của máy)
     const st = isVi ? vs.viStyle : vs.enStyle;
     if (st === 'female') pitch = 1.15;
@@ -114,49 +114,99 @@ const Voice = {
 
 /* ---------- Giọng tiếng Việt vùng miền qua FPT.AI (cần API key, có Internet) ----------
    API trả về một link mp3 "async": file có sau vài giây nên phải chờ rồi mới phát. */
+/* Giọng của model FPT.TTS-pro trên Marketplace (vùng miền chưa được FPT công bố — bấm Nghe thử để chọn) */
+const FPT_PRO_VOICES = [
+  ['std_banmai', 'Ban Mai (chuẩn)'], ['std_quanganh', 'Quang Anh (chuẩn)'],
+  ['fci_phuongan', 'Phương An'], ['fci_vietkhoa', 'Việt Khoa'], ['fci_xuantoan', 'Xuân Toàn']
+];
+/* Giọng của cổng cũ api.fpt.ai */
 const FPT_VOICES = [
   ['banmai', 'Ban Mai · nữ · miền Bắc'], ['thuminh', 'Thu Minh · nữ · miền Bắc'], ['leminh', 'Lê Minh · nam · miền Bắc'],
   ['myan', 'Mỹ An · nữ · miền Trung'], ['giahuy', 'Gia Huy · nam · miền Trung'],
   ['lannhi', 'Lan Nhi · nữ · miền Nam'], ['linhsan', 'Linh San · nữ · miền Nam']
 ];
+const FPT_BASE = 'https://mkp-api.fptcloud.com';
 const FPT = (() => {
-  const cache = new Map();      // câu → Promise<link mp3>
+  const cache = new Map();      // câu → Promise<nguồn âm thanh (link mp3 / data URL / blob URL)>
   let audio = null;
-  function request(text) {
-    const vs = S.voice, key = vs.fptVoice + '|' + text;
-    if (cache.has(key)) return cache.get(key);
-    const pr = fetch('https://api.fpt.ai/hmi/tts/v5', {
-      method: 'POST',
-      headers: { 'api-key': vs.fptKey, voice: vs.fptVoice || 'banmai', speed: '-1', 'content-type': 'text/plain' },
-      body: text
-    }).then(r => r.json()).then(j => {
-      if (j.error !== 0 && j.error !== '0' || !j.async) throw new Error(j.message || 'FPT.AI lỗi');
-      return j.async;
+  const vs = () => S.voice;
+  const nativeHttp = () => Native.isNative && window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.CapacitorHttp;
+
+  /* Gọi HTTP: trên APK đi đường native (không bị chặn CORS), trên web dùng fetch */
+  async function http(url, { method = 'GET', headers = {}, body, binary } = {}) {
+    const H = nativeHttp();
+    if (H) {
+      const r = await H.request({ url, method, headers, data: body, responseType: binary ? 'blob' : 'json', readTimeout: 30000, connectTimeout: 15000 });
+      if (r.status >= 400) throw new Error(`HTTP ${r.status}: ${typeof r.data === 'string' ? r.data.slice(0, 160) : JSON.stringify(r.data).slice(0, 160)}`);
+      if (binary) return 'data:audio/mpeg;base64,' + r.data;
+      return typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+    }
+    const r = await fetch(url, { method, headers, body: body && typeof body !== 'string' ? JSON.stringify(body) : body });
+    if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).slice(0, 160)}`);
+    return binary ? URL.createObjectURL(await r.blob()) : r.json();
+  }
+
+  /* --- Cách mới: FPT AI Marketplace (Token Factory), kiểu OpenAI /v1/audio/speech --- */
+  function mkp(text) {
+    const v = vs();
+    return http(`${FPT_BASE}/v1/audio/speech`, {
+      method: 'POST', binary: true,
+      headers: { Authorization: `Bearer ${v.fptKey}`, 'content-type': 'application/json' },
+      body: { model: v.fptModel || 'FPT.TTS-pro', input: text, voice: v.fptVoice || 'std_banmai', response_format: 'mp3', speed: 1 }
     });
+  }
+  /* --- Cách cũ: api.fpt.ai/hmi/tts/v5 (trả link mp3 tạo sau vài giây) --- */
+  async function legacy(text) {
+    const v = vs();
+    const j = await http('https://api.fpt.ai/hmi/tts/v5', {
+      method: 'POST',
+      headers: { 'api-key': v.fptKey, voice: v.fptVoice || 'banmai', speed: '-1', 'content-type': 'text/plain' },
+      body: text
+    });
+    if ((j.error !== 0 && j.error !== '0') || !j.async) throw new Error(j.message || 'FPT.AI lỗi');
+    return j.async;
+  }
+  function request(text) {
+    const v = vs(), key = [v.fptMode, v.fptModel, v.fptVoice, text].join('|');
+    if (cache.has(key)) return cache.get(key);
+    const pr = v.fptMode === 'legacy' ? legacy(text) : mkp(text);
     pr.catch(() => cache.delete(key));
     cache.set(key, pr);
-    if (cache.size > 200) cache.delete(cache.keys().next().value);
+    if (cache.size > 150) { const k = cache.keys().next().value; cache.get(k).then(u => u.startsWith('blob:') && URL.revokeObjectURL(u)).catch(() => {}); cache.delete(k); }
     return pr;
   }
-  /* Phát link mp3, thử lại mỗi giây cho đến khi file sẵn sàng (tối đa ~9 giây) */
-  function play(url) {
+  /* Phát âm thanh; link của cách cũ cần chờ file sẵn sàng nên thử lại mỗi giây (tối đa ~9 giây) */
+  function play(src) {
     return new Promise((res, rej) => {
       let tries = 0;
+      const remote = /^https?:/.test(src);
       const a = audio = new Audio();
       const attempt = () => {
         if (audio !== a) return res();
-        a.src = url + (tries ? (url.includes('?') ? '&' : '?') + 't=' + tries : '');
+        a.src = remote && tries ? src + (src.includes('?') ? '&' : '?') + 't=' + tries : src;
         a.play().catch(() => {});
       };
       a.onended = () => res();
-      a.onerror = () => { if (++tries > 9 || audio !== a) return rej(new Error('Chưa có file âm thanh')); setTimeout(attempt, 1000); };
+      a.onerror = () => {
+        if (!remote || ++tries > 9 || audio !== a) return rej(new Error('Không phát được âm thanh'));
+        setTimeout(attempt, 1000);
+      };
       attempt();
     });
   }
   return {
-    prefetch(text) { if (text && S.voice.viEngine === 'fpt' && S.voice.fptKey) request(text).catch(() => {}); },
-    async speak(text) { const url = await request(text); return play(url); },
-    stop() { if (audio) { try { audio.pause(); } catch (e) {} audio = null; } }
+    ready() { const v = vs(); return !!(v.viEngine === 'fpt' && v.fptKey); },
+    prefetch(text) { if (text && this.ready()) request(text).catch(() => {}); },
+    async speak(text) { if (!this.ready()) throw new Error('Chưa cài FPT'); return play(await request(text)); },
+    stop() { if (audio) { try { audio.pause(); } catch (e) {} audio = null; } },
+    /* Liệt kê model trong tài khoản Marketplace, ưu tiên model giọng nói */
+    async models(key) {
+      const j = await http(`${FPT_BASE}/v1/models`, { headers: { Authorization: `Bearer ${key}` } });
+      const ids = (j.data || j.models || []).map(m => m.id || m.name || m).filter(x => typeof x === 'string');
+      const isTts = id => /tts|speech|voice|audio|vits|giong/i.test(id) && !/whisper|stt|transcri|asr/i.test(id);
+      return { tts: ids.filter(isTts), all: ids };
+    },
+    clear() { cache.clear(); }
   };
 })();
 

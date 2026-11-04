@@ -14,7 +14,7 @@ const DEFAULTS = {
   maxCount: 10, lowerCase: false,
   aiOn: true, apiKey: '', model: 'claude-haiku-5-5', aiDaily: 30, aiUsed: { date: '', n: 0 },
   stars: 0, traced: {}, book: {},
-  voice: { enStyle: 'auto', enVoice: '', viStyle: 'auto', viVoice: '', viEngine: 'device', fptKey: '', fptVoice: 'banmai' }
+  voice: { enStyle: 'auto', enVoice: '', viStyle: 'auto', viVoice: '', viEngine: 'device', fptMode: 'mkp', fptKey: '', fptModel: 'FPT.TTS-pro', fptVoice: 'std_banmai' }
 };
 const S = (() => {
   let s = {};
@@ -813,9 +813,19 @@ SCREENS.settings = {
         <label>Giọng đọc trên máy <select id="viVoiceSel"><option value="">Mặc định của máy</option></select></label>
       </div>
       <div id="viFpt" class="form-sub">
-        <label>Giọng vùng miền <select id="fptVoice">${FPT_VOICES.map(v => `<option value="${v[0]}" ${S.voice.fptVoice === v[0] ? 'selected' : ''}>${v[1]}</option>`).join('')}</select></label>
-        <label>FPT.AI API key <input type="password" id="fptKey" value="${esc(S.voice.fptKey)}" placeholder="Lấy tại console.fpt.ai"></label>
-        <div class="help">Mỗi câu cần vài giây để FPT.AI tạo file âm thanh; nếu chưa kịp hoặc lỗi mạng, app tự đọc bằng giọng của máy.</div>
+        <label>Cổng FPT <select id="fptMode">
+          <option value="mkp" ${S.voice.fptMode !== 'legacy' ? 'selected' : ''}>FPT AI Marketplace / Token Factory (mới)</option>
+          <option value="legacy" ${S.voice.fptMode === 'legacy' ? 'selected' : ''}>api.fpt.ai (cũ)</option></select></label>
+        <label>API key <input type="password" id="fptKey" value="${esc(S.voice.fptKey)}" placeholder="Marketplace › My account › My API Keys"></label>
+        <div id="fptMkp" class="form-sub">
+          <label>Model giọng nói <span class="row" style="justify-content:flex-start;flex-wrap:nowrap">
+            <input type="text" id="fptModel" list="fptModels" value="${esc(S.voice.fptModel || 'FPT.TTS-pro')}" placeholder="FPT.TTS-pro" style="flex:1;min-width:0">
+            <button class="btn" id="fptFind" type="button">🔍 Tìm</button></span></label>
+          <datalist id="fptModels"><option value="FPT.TTS-pro"><option value="FPT.TTS-ultra"><option value="FPT.AI-VITs"></datalist>
+        </div>
+        <label>Giọng đọc <select id="fptVoice"></select></label>
+        <div class="help" id="fptVoiceHelp"></div>
+        <div class="help" id="fptFound"></div>
       </div>
       <div class="row" style="justify-content:flex-start"><button class="btn" id="tryVi">🔊 Nghe thử</button></div>
       <div class="help">Giọng tiếng Việt: ${Voice.viOK ? '✅ có trên máy' : '⚠️ chưa có — vào Cài đặt Android › Chuyển văn bản thành giọng nói › tải gói tiếng Việt'}.
@@ -849,18 +859,60 @@ SCREENS.settings = {
     };
     fillSel('#enVoiceSel', 'en', S.voice.enVoice);
     fillSel('#viVoiceSel', 'vi', S.voice.viVoice);
-    const showEngine = () => { const f = $('#viEngine', p).value === 'fpt'; $('#viFpt', p).hidden = !f; $('#viDevice', p).hidden = f; };
-    $('#viEngine', p).onchange = showEngine; showEngine();
+    const fillFptVoices = () => {
+      const legacy = $('#fptMode', p).value === 'legacy', sel = $('#fptVoice', p);
+      const list = legacy ? FPT_VOICES : FPT_PRO_VOICES;
+      const other = (legacy ? FPT_PRO_VOICES : FPT_VOICES).map(v => v[0]);
+      let cur = sel.value || S.voice.fptVoice;
+      if (other.includes(cur)) cur = list[0][0];          // đổi cổng → về giọng mặc định của cổng đó
+      sel.innerHTML = list.map(v => `<option value="${v[0]}">${v[1]}</option>`).join('') + `<option value="__other">Giọng khác (tự gõ tên)…</option>`;
+      if (cur && !list.some(v => v[0] === cur) && cur !== '__other') sel.insertAdjacentHTML('afterbegin', `<option value="${esc(cur)}">${esc(cur)}</option>`);
+      sel.value = list.some(v => v[0] === cur) || sel.querySelector(`option[value="${CSS.escape(cur)}"]`) ? cur : list[0][0];
+      $('#fptVoiceHelp', p).textContent = legacy
+        ? 'Cổng cũ có giọng theo vùng: Bắc, Trung, Nam. Mỗi câu cần chờ vài giây để tạo file.'
+        : 'FPT chưa công bố giọng nào thuộc vùng nào cho model FPT.TTS-pro — bấm Nghe thử từng giọng để chọn. Nếu FPT lỗi, app tự đọc bằng giọng của máy.';
+    };
+    $('#fptVoice', p).onchange = e => {
+      if (e.target.value !== '__other') return;
+      const t = document.createElement('input'); t.id = 'fptVoiceOther'; t.placeholder = 'Gõ tên giọng, ví dụ fci_phuongan';
+      e.target.insertAdjacentElement('afterend', t); t.focus();
+    };
+    const showEngine = () => {
+      const f = $('#viEngine', p).value === 'fpt'; $('#viFpt', p).hidden = !f; $('#viDevice', p).hidden = f;
+      $('#fptMkp', p).hidden = $('#fptMode', p).value === 'legacy';
+      fillFptVoices();
+    };
+    $('#viEngine', p).onchange = showEngine; $('#fptMode', p).onchange = showEngine; showEngine();
+    $('#fptFind', p).onclick = async e => {
+      const b = e.currentTarget, out = $('#fptFound', p), key = $('#fptKey', p).value.trim();
+      if (!key) { out.textContent = '⚠️ Nhập API key trước.'; return; }
+      b.disabled = true; out.textContent = '⏳ Đang lấy danh sách model...';
+      try {
+        const { tts, all } = await FPT.models(key);
+        $('#fptModels', p).innerHTML = (tts.length ? tts : all).map(id => `<option value="${esc(id)}">`).join('');
+        if (tts.length) { if (!tts.includes($('#fptModel', p).value)) $('#fptModel', p).value = tts.includes('FPT.TTS-pro') ? 'FPT.TTS-pro' : tts[0]; out.innerHTML = `✅ Model giọng nói: <b>${tts.map(esc).join(', ')}</b>`; }
+        else out.innerHTML = `⚠️ Tài khoản chưa có model đọc văn bản (TTS). Các model đang có: ${all.slice(0, 30).map(esc).join(', ') || '(trống)'}. Hãy bật/đăng ký model Text to Speech trên Marketplace, hoặc chọn cổng api.fpt.ai (cũ).`;
+      } catch (err) {
+        out.textContent = '❌ ' + err.message + (Native.isNative ? '' : ' — Trên link web có thể trình duyệt chặn; hãy thử trên bản APK.');
+      } finally { b.disabled = false; }
+    };
     const readVoice = () => ({
       enStyle: $('#enStyle', p).value, enVoice: $('#enVoiceSel', p).value,
       viStyle: $('#viStyle', p).value, viVoice: $('#viVoiceSel', p).value,
-      viEngine: $('#viEngine', p).value, fptKey: $('#fptKey', p).value.trim(), fptVoice: $('#fptVoice', p).value
+      viEngine: $('#viEngine', p).value, fptMode: $('#fptMode', p).value, fptKey: $('#fptKey', p).value.trim(),
+      fptModel: $('#fptModel', p).value.trim() || 'FPT.TTS-pro',
+      fptVoice: ($('#fptVoice', p).value === '__other' ? ($('#fptVoiceOther', p) ? $('#fptVoiceOther', p).value.trim() : '') : $('#fptVoice', p).value) || ($('#fptMode', p).value === 'legacy' ? 'banmai' : 'std_banmai')
     });
     const withVoice = async fn => { const old = S.voice; S.voice = readVoice(); try { await fn(); } finally { S.voice = old; } };
     $('#tryEn', p).onclick = () => withVoice(() => Voice.speak(`Hi! I am ${char().name}. Let's play!`, 'en-US', char().pitch, S.rate * char().rate));
     $('#tryVi', p).onclick = async e => {
       const b = e.currentTarget; b.disabled = true; b.textContent = '⏳ Đang tạo giọng...';
-      await withVoice(() => Voice.speak('Chào bé! Mình cùng học tiếng Anh nhé!', 'vi-VN', 1.1, 1.0)).catch(() => {});
+      await withVoice(async () => {
+        if (!FPT.ready()) return Voice.speak('Chào bé! Mình cùng học tiếng Anh nhé!', 'vi-VN', 1.1, 1.0);
+        FPT.clear();
+        try { await FPT.speak('Chào bé! Mình cùng học tiếng Anh nhé!'); $('#fptFound', p).textContent = '✅ Giọng FPT hoạt động.'; }
+        catch (err) { $('#fptFound', p).textContent = '❌ FPT: ' + err.message; }
+      }).catch(() => {});
       b.disabled = false; b.textContent = '🔊 Nghe thử';
     };
 

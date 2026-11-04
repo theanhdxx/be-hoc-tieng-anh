@@ -456,3 +456,5 @@ main.robotmode .panel { overflow: visible; padding: 0; gap: 6px; }
   .mgrid { max-width: 520px; gap: 8px; }
   .mcard { aspect-ratio: 16 / 9; }
 }
+
+[hidden] { display: none !important; }
