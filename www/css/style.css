@@ -28,7 +28,7 @@ body::after { /* bãi cỏ */
 }
 button { font-family: inherit; color: inherit; border: 0; cursor: pointer; }
 
-#app { height: 100%; display: grid; grid-template-rows: 70px 1fr; padding: env(safe-area-inset-top) 16px 12px; }
+#app { height: 100%; height: 100dvh; display: grid; grid-template-rows: 70px minmax(0, 1fr); padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
 
 /* ---------- Thanh trên ---------- */
 header { display: flex; align-items: center; gap: 12px; }
@@ -39,10 +39,12 @@ header { display: flex; align-items: center; gap: 12px; }
 .stars.bump { animation: bump .5s; }
 @keyframes bump { 40% { transform: scale(1.35) rotate(-6deg); } }
 .hidden { visibility: hidden; }
+#back.hidden { display: none; }
 
 /* ---------- Bố cục chính ---------- */
-main { display: grid; grid-template-columns: minmax(250px, 36%) 1fr; gap: 16px; min-height: 0; }
-main.full { grid-template-columns: 1fr; }
+main { display: grid; grid-template-columns: minmax(220px, 36%) minmax(0, 1fr); gap: 16px; min-height: 0; }
+main.full { grid-template-columns: minmax(0, 1fr); }
+.stage, .panel { min-width: 0; }
 main.full .stage { display: none; }
 .stage { position: relative; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; min-height: 0; }
 .bubble {
@@ -172,7 +174,7 @@ main.full .stage { display: none; }
 .form input[type=checkbox] { width: 30px; height: 30px; accent-color: var(--accent); }
 .form .help { font-size: 15px; color: var(--muted); line-height: 1.4; }
 .gate { font-size: 46px; font-weight: 800; }
-.keypad { display: grid; grid-template-columns: repeat(5, 76px); gap: 10px; }
+.keypad { display: grid; grid-template-columns: repeat(5, minmax(0, 76px)); gap: 10px; }
 .keypad button { height: 66px; border-radius: 18px; font-size: 32px; font-weight: 800; background: var(--card); box-shadow: var(--shadow); }
 
 /* ---------- Pháo giấy ---------- */
@@ -180,20 +182,6 @@ main.full .stage { display: none; }
 @keyframes fall { to { transform: translateY(110vh) rotate(720deg); } }
 .toast { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); font-size: 120px; z-index: 98; pointer-events: none; animation: toast 1.2s forwards; }
 @keyframes toast { 0% { transform: translate(-50%,-50%) scale(.2); opacity: 0; } 25% { transform: translate(-50%,-50%) scale(1.2); opacity: 1; } 80% { opacity: 1; } 100% { transform: translate(-50%,-90%) scale(1); opacity: 0; } }
-
-/* ---------- Màn hình dọc / nhỏ ---------- */
-@media (orientation: portrait), (max-width: 760px) {
-  main { grid-template-columns: 1fr; grid-template-rows: minmax(200px, 34%) 1fr; }
-  .charbox svg { max-height: 220px; }
-  .bubble .en { font-size: 22px; }
-  .picture { font-size: 110px; }
-}
-@media (max-height: 560px) {
-  .tile { min-height: 110px; } .tile .ico { font-size: 46px; }
-  .picture { font-size: 96px; } .swatch { width: 130px; height: 130px; }
-  .mic { width: 104px; height: 104px; font-size: 48px; }
-  .card { width: 130px; height: 150px; font-size: 84px; }
-}
 
 /* ---------- Học theo sách ---------- */
 .units { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
@@ -211,3 +199,143 @@ main.full .stage { display: none; }
 /* Lớp phủ Bắt đầu (bản web) */
 .startov { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: center; background: rgba(191, 232, 255, .55); backdrop-filter: blur(3px); }
 .startov .btn { font-size: 40px; padding: 22px 48px; animation: pulse 1.4s infinite; }
+
+/* ================== MÀN HÌNH NHỎ (điện thoại) ================== */
+
+/* --- Tablet dọc / màn hẹp: nhân vật ở trên, nội dung ở dưới --- */
+@media (orientation: portrait), (max-width: 760px) {
+  main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(170px, 32%) minmax(0, 1fr); gap: 10px; }
+  .charbox svg { max-height: 220px; }
+  .bubble .en { font-size: 22px; }
+  .picture { font-size: 110px; }
+}
+
+/* --- Điện thoại dọc: nhân vật nhỏ bên trái, bong bóng thoại bên phải --- */
+@media (max-width: 600px) and (orientation: portrait) {
+  #app { grid-template-rows: 54px minmax(0, 1fr); padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  header { gap: 8px; }
+  .round { width: 44px; height: 44px; font-size: 22px; }
+  #title { font-size: 20px; }
+  .stars { font-size: 18px; padding: 2px 12px; }
+  main { grid-template-rows: auto minmax(0, 1fr); }
+  .stage { flex-direction: row-reverse; align-items: center; justify-content: flex-end; gap: 6px; height: 130px; }
+  .charbox { flex: 0 0 105px; height: 130px; align-items: center; }
+  .charbox svg { max-height: 130px; }
+  .bubble { flex: 1; margin: 0; padding: 8px 12px; border-radius: 20px; min-height: 0; }
+  .bubble::after { bottom: auto; top: 50%; left: -14px; margin: -10px 0 0; border: 10px solid transparent; border-right: 14px solid var(--card); border-left: 0; }
+  .bubble .en { font-size: 18px; }
+  .bubble .vi { font-size: 14px; }
+  .bubble.empty { opacity: 1; }
+
+  .panel { gap: 10px; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .tile { min-height: 118px; border-radius: 22px; font-size: 18px; padding: 12px 6px; text-align: center; line-height: 1.2; }
+  .tile .ico { font-size: 44px; }
+  .tile small { font-size: 13px; }
+  .units { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .unit { border-radius: 18px; font-size: 16px; padding: 8px 4px; }
+  .unit .ul { font-size: 34px; }
+  .unit small { font-size: 11px; }
+  .unithead { padding: 8px 12px; gap: 10px; font-size: 15px; }
+  .unithead .bigL { font-size: 48px; }
+
+  .picture { font-size: 96px; }
+  .picture.small { font-size: 48px; letter-spacing: 2px; }
+  .swatch { width: 130px; height: 130px; }
+  .choice { font-size: 22px; padding: 10px 18px; min-width: 0; }
+  .choice .ce { font-size: 30px; }
+  .mic { width: 96px; height: 96px; font-size: 44px; }
+  .btn { font-size: 18px; padding: 10px 16px; }
+  .btn.big { font-size: 22px; padding: 12px 22px; }
+  .row { gap: 10px; }
+  .center { gap: 12px; }
+
+  .field { min-height: 0; padding: 10px; gap: 6px; border-radius: 22px; }
+  .obj { font-size: 50px; width: 72px; height: 72px; border-radius: 18px; }
+  .obj .badge { width: 30px; height: 30px; font-size: 17px; }
+  .numbtn { width: 78px; height: 78px; font-size: 42px; border-radius: 22px; }
+
+  .glyphs { grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 8px; }
+  .glyph { font-size: 32px; border-radius: 16px; }
+  .tracebox { min-height: 0; border-radius: 22px; }
+  .tracebox .hint { font-size: 42px; }
+
+  .cards { gap: 12px; }
+  .card { width: 28vw; height: 32vw; max-width: 130px; max-height: 150px; font-size: 18vw; border-radius: 22px; }
+
+  .charpick { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-content: start; }
+  .charcard { font-size: 16px; padding: 8px; border-radius: 22px; }
+  .charcard .mini { height: 150px; }
+
+  .form { padding: 14px; font-size: 17px; }
+  .form label { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .gate { font-size: 36px; }
+  .keypad button { height: 58px; font-size: 26px; }
+  .msg { font-size: 18px; max-width: 88%; }
+  .textin input { font-size: 16px; min-width: 0; }
+}
+
+/* --- Điện thoại ngang (màn thấp): thu gọn mọi thứ --- */
+@media (max-height: 560px) {
+  .tile { min-height: 110px; } .tile .ico { font-size: 46px; }
+  .picture { font-size: 96px; } .swatch { width: 130px; height: 130px; }
+  .mic { width: 104px; height: 104px; font-size: 48px; }
+  .card { width: 130px; height: 150px; font-size: 84px; }
+}
+@media (max-height: 460px) and (orientation: landscape) {
+  #app { grid-template-rows: 46px minmax(0, 1fr); padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+  .round { width: 40px; height: 40px; font-size: 20px; }
+  #title { font-size: 20px; }
+  .stars { font-size: 17px; padding: 2px 12px; }
+  main { grid-template-columns: minmax(0, 27%) minmax(0, 1fr); gap: 10px; }
+  .bubble { padding: 6px 10px; margin-bottom: 10px; border-radius: 18px; min-height: 0; }
+  .bubble::after { bottom: -10px; margin-left: -10px; border-width: 10px; }
+  .bubble .en { font-size: 16px; }
+  .bubble .vi { font-size: 12px; }
+  .charbox svg { max-height: 170px; }
+
+  .panel { gap: 8px; padding-bottom: 6px; }
+  .tiles { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .tile { min-height: 84px; padding: 8px; font-size: 17px; border-radius: 20px; }
+  .tile .ico { font-size: 32px; }
+  .tile small { font-size: 12px; }
+  .units { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+  .unit { border-radius: 16px; padding: 4px; font-size: 14px; }
+  .unit .ul { font-size: 28px; }
+  .unit small { display: none; }
+  .unit .ustars { font-size: 13px; }
+  .unithead { padding: 6px 12px; font-size: 14px; line-height: 1.35; }
+  .unithead .bigL { font-size: 40px; }
+
+  .progress i { width: 12px; height: 12px; }
+  .picture { font-size: 64px; }
+  .picture.small { font-size: 38px; }
+  .swatch { width: 80px; height: 80px; }
+  .choice { font-size: 18px; padding: 6px 14px; min-width: 0; }
+  .choice .ce { font-size: 24px; }
+  .mic { width: 70px; height: 70px; font-size: 32px; box-shadow: 0 5px 0 #d8579a; }
+  .mic-label { font-size: 13px; }
+  .heard { min-height: 0; font-size: 14px; }
+  .btn { font-size: 16px; padding: 7px 14px; }
+  .btn.big { font-size: 18px; padding: 9px 18px; }
+  .center { gap: 8px; }
+  .row { gap: 8px; }
+
+  .field { min-height: 0; padding: 6px; gap: 4px; }
+  .obj { font-size: 40px; width: 56px; height: 56px; border-radius: 14px; }
+  .obj .badge { width: 24px; height: 24px; font-size: 14px; top: -6px; right: -6px; }
+  .numbtn { width: 60px; height: 60px; font-size: 32px; border-radius: 16px; }
+
+  .glyphs { grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 8px; }
+  .glyph { font-size: 28px; border-radius: 14px; }
+  .tracebox { min-height: 0; border-radius: 20px; }
+  .tracebox .hint { font-size: 36px; }
+
+  .cards { gap: 14px; }
+  .card { width: 96px; height: 110px; font-size: 64px; border-radius: 22px; }
+
+  .charpick { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .charcard { font-size: 16px; padding: 6px; }
+  .charcard .mini { height: 52vh; }
+  .startov .btn { font-size: 28px; padding: 14px 32px; }
+}
