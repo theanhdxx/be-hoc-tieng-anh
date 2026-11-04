@@ -13,7 +13,8 @@ const DEFAULTS = {
   viHint: true, viVoice: true, rate: 0.85,
   maxCount: 10, lowerCase: false,
   aiOn: true, apiKey: '', model: 'claude-haiku-5-5', aiDaily: 30, aiUsed: { date: '', n: 0 },
-  stars: 0, traced: {}, book: {},
+  viRate: 0.8,
+  stars: 0, traced: {}, book: {}, puzzle: {}, puzzleLv: 0,
   voice: { enStyle: 'auto', enVoice: '', viStyle: 'auto', viVoice: '', viEngine: 'device', fptMode: 'mkp', fptKey: '', fptModel: 'FPT.TTS-pro', fptVoice: 'std_banmai' }
 };
 const S = (() => {
@@ -65,6 +66,8 @@ async function talk(en, vi, opts = {}) {
   if (token !== Run.id) return false;
   if (vi && S.viHint && S.viVoice && (Voice.viOK || S.voice.viEngine === 'fpt') && !opts.noVi) {
     await wait(150);
+    if (token !== Run.id) return false;
+    await Voice.idle();
     if (token !== Run.id) return false;
     await Voice.speak(vi, 'vi-VN', 1.1, 1.0);
   }
@@ -803,6 +806,8 @@ SCREENS.settings = {
         <option value="0.7" ${S.rate == 0.7 ? 'selected' : ''}>Rất chậm</option>
         <option value="0.85" ${S.rate == 0.85 ? 'selected' : ''}>Chậm (khuyên dùng)</option>
         <option value="1" ${S.rate == 1 ? 'selected' : ''}>Bình thường</option></select></label>
+      <label>Tốc độ đọc tiếng Việt <select id="viRate">${[[0.6, 'Rất chậm'], [0.7, 'Chậm'], [0.8, 'Hơi chậm (khuyên dùng)'], [0.9, 'Gần bình thường'], [1, 'Bình thường']]
+        .map(([v, t]) => `<option value="${v}" ${S.viRate == v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label>Hiện gợi ý tiếng Việt <input type="checkbox" id="viHint" ${S.viHint ? 'checked' : ''}></label>
       <label>Đọc gợi ý tiếng Việt <input type="checkbox" id="viVoice" ${S.viVoice ? 'checked' : ''}></label>
       <h3>🗣️ Giọng nhân vật (tiếng Anh)</h3>
@@ -908,7 +913,11 @@ SCREENS.settings = {
       fptModel: $('#fptModel', p).value.trim() || 'FPT.TTS-pro',
       fptVoice: ($('#fptVoice', p).value === '__other' ? ($('#fptVoiceOther', p) ? $('#fptVoiceOther', p).value.trim() : '') : $('#fptVoice', p).value) || ($('#fptMode', p).value === 'legacy' ? 'banmai' : 'std_banmai')
     });
-    const withVoice = async fn => { const old = S.voice; S.voice = readVoice(); try { await fn(); } finally { S.voice = old; } };
+    const withVoice = async fn => {
+      const old = S.voice, oldR = S.viRate;
+      S.voice = readVoice(); S.viRate = +$('#viRate', p).value;
+      try { await fn(); } finally { S.voice = old; S.viRate = oldR; }
+    };
     $('#tryEn', p).onclick = () => withVoice(() => Voice.speak(`Hi! I am ${char().name}. Let's play!`, 'en-US', char().pitch, S.rate * char().rate));
     $('#tryVi', p).onclick = async e => {
       const b = e.currentTarget; b.disabled = true; b.textContent = '⏳ Đang tạo giọng...';
@@ -925,7 +934,7 @@ SCREENS.settings = {
       S.voice = readVoice();
       S.childName = $('#childName', p).value.trim();
       S.childAge = +$('#childAge', p).value;
-      S.rate = +$('#rate', p).value;
+      S.rate = +$('#rate', p).value; S.viRate = +$('#viRate', p).value;
       S.viHint = $('#viHint', p).checked; S.viVoice = $('#viVoice', p).checked;
       S.maxCount = +$('#maxCount', p).value; S.lowerCase = $('#lowerCase', p).checked;
       S.aiOn = $('#aiOn', p).checked; S.apiKey = $('#apiKey', p).value.trim();

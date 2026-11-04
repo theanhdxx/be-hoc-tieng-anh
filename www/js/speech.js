@@ -30,6 +30,7 @@ const Voice = {
     const isVi = lang.startsWith('vi');
     if (isVi && !opts.device && FPT.ready()) return FPT.speak(text).catch(e => { console.warn('FPT:', e.message); return this.speak(text, lang, pitch, rate, { device: true }); });
     // Kiểu giọng: nữ / nam / trẻ em (chỉnh cao độ trên giọng của máy)
+    if (isVi && !opts.keepRate) rate = (typeof S !== 'undefined' && S.viRate) || 0.8;
     const st = isVi ? vs.viStyle : vs.enStyle;
     if (st === 'female') pitch = 1.15;
     else if (st === 'male') pitch = 0.72;
@@ -44,6 +45,13 @@ const Voice = {
     }
     if (!('speechSynthesis' in window)) return wait(Math.min(4000, text.length * 70));
     return this._webSpeak(text, lang, pitch, rate, want);
+  },
+  /* Chờ đến khi máy thật sự đọc xong (Safari có thể còn đọc dù đã báo xong), rồi nghỉ một nhịp */
+  async idle(gap = 350) {
+    if (!Native.TTS && 'speechSynthesis' in window) {
+      for (let i = 0; i < 60 && (speechSynthesis.speaking || speechSynthesis.pending); i++) await wait(100);
+    }
+    await wait(gap);
   },
   _nativeVoices: [],
   /* Danh sách giọng có trên máy theo ngôn ngữ ('en' / 'vi') */
@@ -108,10 +116,16 @@ const Voice = {
         this._webVoices.find(v => v.lang && v.lang.replace('_', '-').startsWith(lang.slice(0, 2)));
       if (v) u.voice = v;
       this._keep.push(u); if (this._keep.length > 20) this._keep.shift();
-      let done = false;
-      const fin = () => { if (!done) { done = true; res(); } };
-      u.onend = fin; u.onerror = fin;
-      setTimeout(fin, 3000 + text.length * 150); // phòng khi trình duyệt không báo onend
+      /* Safari hay báo "đọc xong" quá sớm → chỉ coi là xong khi:
+         (1) đã có onend, (2) đã qua thời gian tối thiểu ước theo độ dài câu, (3) máy thật sự không còn đọc */
+      const t0 = Date.now(), minMs = Math.min(8000, text.length * 45 / Math.max(.5, rate));
+      let done = false, ended = false;
+      const finish = () => { if (!done) { done = true; clearInterval(poll); res(); } };
+      const check = () => { if (ended && Date.now() - t0 >= minMs && !ss.speaking && !ss.pending) finish(); };
+      const poll = setInterval(check, 120);
+      u.onend = () => { ended = true; check(); };
+      u.onerror = e => { if (e && e.error === 'interrupted' || e && e.error === 'canceled') finish(); else { ended = true; check(); } };
+      setTimeout(finish, 4000 + text.length * 160); // phòng khi trình duyệt không bao giờ báo xong
       ss.speak(u);
     });
   },
@@ -191,7 +205,7 @@ const FPT = (() => {
     return http(`${FPT_BASE}/v1/audio/speech`, {
       method: 'POST', binary: true,
       headers: { Authorization: `Bearer ${v.fptKey}`, 'content-type': 'application/json' },
-      body: { model: v.fptModel || 'FPT.TTS-pro', input: text, voice: v.fptVoice || 'std_banmai', response_format: 'mp3', speed: 1 }
+      body: { model: v.fptModel || 'FPT.TTS-pro', input: text, voice: v.fptVoice || 'std_banmai', response_format: 'mp3', speed: Math.max(0.7, Math.min(1.3, S.viRate || 0.8)) }
     });
   }
   /* --- Cách cũ: api.fpt.ai/hmi/tts/v5 (trả link mp3 tạo sau vài giây) --- */
@@ -199,7 +213,7 @@ const FPT = (() => {
     const v = vs();
     const j = await http('https://api.fpt.ai/hmi/tts/v5', {
       method: 'POST',
-      headers: { 'api-key': v.fptKey, voice: v.fptVoice || 'banmai', speed: '-1', 'content-type': 'text/plain' },
+      headers: { 'api-key': v.fptKey, voice: v.fptVoice || 'banmai', speed: String(Math.max(-3, Math.min(3, Math.round(((S.viRate || 0.8) - 1) * 10)))), 'content-type': 'text/plain' },
       body: text
     });
     if ((j.error !== 0 && j.error !== '0') || !j.async) throw new Error(j.message || 'FPT.AI lỗi');

@@ -24,7 +24,8 @@ const GAMES = [
   ['cross', '✖️', 'Giải ô chữ', 'Crossword'],
   ['match', '🔗', 'Nối từ với hình', 'Match'],
   ['jigsaw', '🧩', 'Ghép tranh', 'Puzzle'],
-  ['memory', '🃏', 'Lật hình', 'Memory']
+  ['memory', '🃏', 'Lật hình', 'Memory'],
+  ['puzzle', '🖼️', 'Ghép hình 20–50 mảnh', 'Jigsaw']
 ];
 
 /* Độ dài từ theo tuổi */
@@ -51,7 +52,7 @@ SCREENS.games = {
   render(p) {
     p.innerHTML = `<div class="tiles">${GAMES.map((g, i) =>
       `<button class="tile ${TILE_COLORS[(i + 2) % 6]}" data-g="${g[0]}"><span class="ico">${g[1]}</span>${g[2]}<small>${g[3]}</small></button>`).join('')}</div>`;
-    $$('[data-g]', p).forEach(b => b.onclick = () => { Sfx.tap(); go('game', { g: b.dataset.g }); });
+    $$('[data-g]', p).forEach(b => b.onclick = () => { Sfx.tap(); if (b.dataset.g === 'puzzle') go('puzzleMenu'); else go('game', { g: b.dataset.g }); });
     talk("Let's play a game!", 'Mình chơi trò gì nào?');
   }
 };
