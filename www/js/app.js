@@ -108,6 +108,10 @@ function go(name, params = {}, push = true) {
   Stage.talking(false); Stage.mood(null); Stage.bubble('');
   current = name;
   const sc = SCREENS[name];
+  $('#main').classList.remove('robotmode');
+  $('#charbox').onclick = null;
+  if (window.Awake) Awake.off();
+  const ce = $('#charEl'); if (ce) ce.classList.remove('sleeping');
   $('#title').textContent = sc.title(params);
   $('#back').classList.toggle('hidden', name === 'home');
   $('#main').classList.toggle('full', !!sc.full);
@@ -166,6 +170,7 @@ SCREENS.home = {
   render(p) {
     const items = [
       ['bookMenu', '📚', 'Học theo sách lớp 1', 'English 1'],
+      ['robot', '🤖', 'Chế độ robot', 'Robot friend'],
       ['chatTopics', '💬', 'Nói chuyện', 'Talk with me'],
       ['ai', '✨', 'Trò chuyện tự do', 'Free talk'],
       ['count', '🔢', 'Học đếm', 'Count with me'],

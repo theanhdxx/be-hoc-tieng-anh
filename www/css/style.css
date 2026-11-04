@@ -339,3 +339,38 @@ main.full .stage { display: none; }
   .charcard .mini { height: 52vh; }
   .startov .btn { font-size: 28px; padding: 14px 32px; }
 }
+
+/* ================== CHẾ ĐỘ ROBOT ================== */
+main.robotmode { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 8px; }
+main.robotmode .stage { flex-direction: column; justify-content: flex-end; align-items: center; height: auto; cursor: pointer; }
+main.robotmode .charbox { flex: 1; width: 100%; height: auto; min-height: 0; }
+main.robotmode .charbox svg { max-height: none; height: 100%; }
+main.robotmode .bubble { flex: 0 0 auto; max-width: min(92%, 760px); margin: 0 0 14px; padding: 12px 22px; }
+main.robotmode .bubble::after { top: auto; bottom: -16px; left: 50%; margin: 0 0 0 -14px; border: 14px solid transparent; border-top-color: var(--card); border-bottom: 0; }
+main.robotmode .bubble .en { font-size: clamp(20px, 4.2vmin, 34px); }
+main.robotmode .bubble .vi { font-size: clamp(13px, 2.4vmin, 18px); }
+main.robotmode .panel { overflow: visible; padding: 0; gap: 6px; }
+.robotbar { display: flex; align-items: center; justify-content: center; gap: 16px; }
+.robotbar .mic { width: 84px; height: 84px; font-size: 40px; flex: 0 0 auto; }
+.rinfo { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rinfo .mic-label { text-align: left; font-size: 17px; color: var(--ink); }
+.rinfo .heard { text-align: left; min-height: 0; }
+.rauto { white-space: nowrap; flex: 0 0 auto; display: flex; align-items: center; gap: 6px; font-size: 16px; background: var(--card); border-radius: 20px; padding: 6px 12px; box-shadow: var(--shadow); }
+.rauto input { width: 22px; height: 22px; accent-color: var(--accent); }
+.rnote { text-align: center; padding: 4px 12px; font-size: 14px; align-self: center; }
+.char.sleeping .eye { animation: none; transform: scaleY(.1); }
+.char.sleeping .bob { animation: think 3s ease-in-out infinite; }
+.char.sleeping::after { content: 'z Z z'; position: absolute; top: 12%; right: 30%; font-size: 34px; font-weight: 800; color: var(--muted); animation: idle 2s ease-in-out infinite; }
+#charEl { position: relative; }
+@media (max-width: 600px) and (orientation: portrait) {
+  .robotbar { gap: 10px; }
+  .robotbar .mic { width: 70px; height: 70px; font-size: 32px; }
+  .rinfo .mic-label { font-size: 14px; }
+  .rauto { font-size: 13px; padding: 4px 8px; }
+}
+@media (max-height: 460px) and (orientation: landscape) {
+  main.robotmode { grid-template-columns: minmax(0, 1fr); }
+  .robotbar .mic { width: 56px; height: 56px; font-size: 26px; }
+  .rnote { display: none; }
+  main.robotmode .bubble { margin-bottom: 8px; padding: 6px 14px; }
+}
