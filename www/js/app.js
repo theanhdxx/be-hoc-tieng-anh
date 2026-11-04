@@ -13,12 +13,15 @@ const DEFAULTS = {
   viHint: true, viVoice: true, rate: 0.85,
   maxCount: 10, lowerCase: false,
   aiOn: true, apiKey: '', model: 'claude-haiku-5-5', aiDaily: 30, aiUsed: { date: '', n: 0 },
-  stars: 0, traced: {}, book: {}
+  stars: 0, traced: {}, book: {},
+  voice: { enStyle: 'auto', enVoice: '', viStyle: 'auto', viVoice: '', viEngine: 'device', fptKey: '', fptVoice: 'banmai' }
 };
 const S = (() => {
   let s = {};
   try { s = JSON.parse(localStorage.getItem('kidsEnglish') || '{}'); } catch (e) {}
-  return Object.assign({}, DEFAULTS, s);
+  const o = Object.assign({}, DEFAULTS, s);
+  o.voice = Object.assign({}, DEFAULTS.voice, s.voice || {});
+  return o;
 })();
 const save = () => { try { localStorage.setItem('kidsEnglish', JSON.stringify(S)); } catch (e) {} };
 const char = () => CHARACTERS[S.charId] || CHARACTERS.luna;
@@ -55,11 +58,12 @@ const fill = t => String(t || '')
 async function talk(en, vi, opts = {}) {
   const token = Run.id;
   en = fill(en); vi = fill(vi);
+  if (vi && S.viHint && S.viVoice && !opts.noVi) FPT.prefetch(vi);
   Stage.bubble(en, vi);
   Stage.talking(true);
   await Voice.speak(en, 'en-US', char().pitch, S.rate * char().rate);
   if (token !== Run.id) return false;
-  if (vi && S.viHint && S.viVoice && Voice.viOK && !opts.noVi) {
+  if (vi && S.viHint && S.viVoice && (Voice.viOK || S.voice.viEngine === 'fpt') && !opts.noVi) {
     await wait(150);
     if (token !== Run.id) return false;
     await Voice.speak(vi, 'vi-VN', 1.1, 1.0);
@@ -171,6 +175,7 @@ SCREENS.home = {
     const items = [
       ['bookMenu', '📚', 'Học theo sách lớp 1', 'English 1'],
       ['robot', '🤖', 'Chế độ robot', 'Robot friend'],
+      ['games', '🎮', 'Trò chơi', 'Games'],
       ['chatTopics', '💬', 'Nói chuyện', 'Talk with me'],
       ['ai', '✨', 'Trò chuyện tự do', 'Free talk'],
       ['count', '🔢', 'Học đếm', 'Count with me'],
@@ -795,6 +800,24 @@ SCREENS.settings = {
         <option value="1" ${S.rate == 1 ? 'selected' : ''}>Bình thường</option></select></label>
       <label>Hiện gợi ý tiếng Việt <input type="checkbox" id="viHint" ${S.viHint ? 'checked' : ''}></label>
       <label>Đọc gợi ý tiếng Việt <input type="checkbox" id="viVoice" ${S.viVoice ? 'checked' : ''}></label>
+      <h3>🗣️ Giọng nhân vật (tiếng Anh)</h3>
+      <label>Kiểu giọng <select id="enStyle"><option value="auto" ${S.voice.enStyle === 'auto' ? 'selected' : ''}>Tự động theo nhân vật</option><option value="female" ${S.voice.enStyle === 'female' ? 'selected' : ''}>Nữ</option><option value="male" ${S.voice.enStyle === 'male' ? 'selected' : ''}>Nam</option><option value="child" ${S.voice.enStyle === 'child' ? 'selected' : ''}>Trẻ em</option></select></label>
+      <label>Giọng đọc trên máy <select id="enVoiceSel"><option value="">Mặc định của máy</option></select></label>
+      <div class="row" style="justify-content:flex-start"><button class="btn" id="tryEn">🔊 Nghe thử</button></div>
+      <h3>🇻🇳 Giọng gợi ý tiếng Việt</h3>
+      <label>Nguồn giọng <select id="viEngine">
+        <option value="device" ${S.voice.viEngine === 'device' ? 'selected' : ''}>Giọng có sẵn trên máy (miễn phí)</option>
+        <option value="fpt" ${S.voice.viEngine === 'fpt' ? 'selected' : ''}>FPT.AI — chọn vùng miền (cần key, có mạng)</option></select></label>
+      <div id="viDevice" class="form-sub">
+        <label>Kiểu giọng <select id="viStyle"><option value="auto" ${S.voice.viStyle === 'auto' ? 'selected' : ''}>Mặc định</option><option value="female" ${S.voice.viStyle === 'female' ? 'selected' : ''}>Nữ</option><option value="male" ${S.voice.viStyle === 'male' ? 'selected' : ''}>Nam</option><option value="child" ${S.voice.viStyle === 'child' ? 'selected' : ''}>Trẻ em</option></select></label>
+        <label>Giọng đọc trên máy <select id="viVoiceSel"><option value="">Mặc định của máy</option></select></label>
+      </div>
+      <div id="viFpt" class="form-sub">
+        <label>Giọng vùng miền <select id="fptVoice">${FPT_VOICES.map(v => `<option value="${v[0]}" ${S.voice.fptVoice === v[0] ? 'selected' : ''}>${v[1]}</option>`).join('')}</select></label>
+        <label>FPT.AI API key <input type="password" id="fptKey" value="${esc(S.voice.fptKey)}" placeholder="Lấy tại console.fpt.ai"></label>
+        <div class="help">Mỗi câu cần vài giây để FPT.AI tạo file âm thanh; nếu chưa kịp hoặc lỗi mạng, app tự đọc bằng giọng của máy.</div>
+      </div>
+      <div class="row" style="justify-content:flex-start"><button class="btn" id="tryVi">🔊 Nghe thử</button></div>
       <div class="help">Giọng tiếng Việt: ${Voice.viOK ? '✅ có trên máy' : '⚠️ chưa có — vào Cài đặt Android › Chuyển văn bản thành giọng nói › tải gói tiếng Việt'}.
       Nhận dạng giọng nói: ${Ears.available ? '✅ sẵn sàng' : '⚠️ chưa có — cần ứng dụng Google trên máy'}.</div>
       <h3>🔢 Học đếm & chữ</h3>
@@ -817,7 +840,32 @@ SCREENS.settings = {
       if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Bấm lần nữa để xóa'; return; }
       S.stars = 0; S.traced = {}; save(); $('#stars span').textContent = 0; go('settings', {}, false);
     };
+    /* --- giọng nói: nạp danh sách giọng trên máy --- */
+    const fillSel = async (id, prefix, cur) => {
+      const sel = $(id, p); if (!sel) return;
+      const list = await Voice.list(prefix);
+      list.forEach(v => { const o = document.createElement('option'); o.value = v.name; o.textContent = v.label; if (v.name === cur) o.selected = true; sel.appendChild(o); });
+      if (!list.length) sel.options[0].textContent = 'Máy chưa có giọng này';
+    };
+    fillSel('#enVoiceSel', 'en', S.voice.enVoice);
+    fillSel('#viVoiceSel', 'vi', S.voice.viVoice);
+    const showEngine = () => { const f = $('#viEngine', p).value === 'fpt'; $('#viFpt', p).hidden = !f; $('#viDevice', p).hidden = f; };
+    $('#viEngine', p).onchange = showEngine; showEngine();
+    const readVoice = () => ({
+      enStyle: $('#enStyle', p).value, enVoice: $('#enVoiceSel', p).value,
+      viStyle: $('#viStyle', p).value, viVoice: $('#viVoiceSel', p).value,
+      viEngine: $('#viEngine', p).value, fptKey: $('#fptKey', p).value.trim(), fptVoice: $('#fptVoice', p).value
+    });
+    const withVoice = async fn => { const old = S.voice; S.voice = readVoice(); try { await fn(); } finally { S.voice = old; } };
+    $('#tryEn', p).onclick = () => withVoice(() => Voice.speak(`Hi! I am ${char().name}. Let's play!`, 'en-US', char().pitch, S.rate * char().rate));
+    $('#tryVi', p).onclick = async e => {
+      const b = e.currentTarget; b.disabled = true; b.textContent = '⏳ Đang tạo giọng...';
+      await withVoice(() => Voice.speak('Chào bé! Mình cùng học tiếng Anh nhé!', 'vi-VN', 1.1, 1.0)).catch(() => {});
+      b.disabled = false; b.textContent = '🔊 Nghe thử';
+    };
+
     $('#saveBtn', p).onclick = () => {
+      S.voice = readVoice();
       S.childName = $('#childName', p).value.trim();
       S.childAge = +$('#childAge', p).value;
       S.rate = +$('#rate', p).value;

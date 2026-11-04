@@ -374,3 +374,85 @@ main.robotmode .panel { overflow: visible; padding: 0; gap: 6px; }
   .rnote { display: none; }
   main.robotmode .bubble { margin-bottom: 8px; padding: 6px 14px; }
 }
+
+/* ================== TRÒ CHƠI ================== */
+.form-sub { display: grid; gap: 14px; }
+.slots { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.slot { width: 74px; height: 84px; border-radius: 18px; background: rgba(255,255,255,.7); border: 4px dashed #c9bfe6; display: grid; place-items: center; font-size: 52px; font-weight: 800; color: var(--ink); }
+.slot.filled { background: var(--card); border: 4px solid var(--green); animation: popin .3s; }
+.slot.blink { animation: blinkslot 1s 2; }
+@keyframes blinkslot { 50% { border-color: var(--pink); background: #ffe3ef; } }
+.ltiles { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.ltile { width: 78px; height: 78px; border-radius: 20px; font-size: 46px; font-weight: 800; background: var(--yellow); box-shadow: 0 6px 0 #e0a800; color: var(--ink); }
+.ltile.used { opacity: .25; }
+.ltile.wrong, .mpic.wrong, .mword.wrong { animation: shake .4s; background: #ffcdd2; }
+
+.cwwrap { flex: 1; display: flex; gap: 24px; align-items: center; justify-content: center; flex-wrap: wrap; min-height: 0; --cw: clamp(44px, 9vmin, 76px); }
+.cwgrid { display: grid; gap: 5px; }
+.cwcell { position: relative; background: var(--card); border-radius: 12px; box-shadow: 0 4px 0 rgba(59,47,92,.15); display: grid; place-items: center; font-size: calc(var(--cw) * .6); font-weight: 800; }
+.cwcell i { position: absolute; top: 2px; left: 5px; font-size: 13px; font-style: normal; color: var(--muted); }
+.cwcell.hl { background: #fff3c4; box-shadow: 0 0 0 4px var(--yellow); }
+.cwcell.filled b { animation: popin .3s; color: var(--ink); }
+.cwclues { display: flex; flex-direction: column; gap: 10px; }
+.cwclue { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 20px; padding: 6px 16px; box-shadow: var(--shadow); font-size: 40px; }
+.cwclue i { font-style: normal; font-size: 20px; font-weight: 800; background: var(--accent); color: #fff; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; }
+.cwclue small { font-size: 20px; }
+.cwclue.sel { box-shadow: 0 0 0 5px var(--accent), var(--shadow); }
+.cwclue.done { background: #dcf5d9; }
+.cwclue.done::after { content: '⭐'; font-size: 22px; }
+
+.mwrap { position: relative; flex: 1; display: flex; justify-content: space-between; gap: 18%; padding: 0 4%; min-height: 0; }
+.mlines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.mcol { display: flex; flex-direction: column; justify-content: space-around; gap: 12px; flex: 1; max-width: 240px; }
+.mword { border-radius: 24px; padding: 12px; font-size: 30px; font-weight: 800; background: var(--card); box-shadow: var(--shadow); }
+.mpic { border-radius: 24px; padding: 4px; font-size: 56px; line-height: 1.2; background: var(--card); box-shadow: var(--shadow); }
+.mword.sel { box-shadow: 0 0 0 5px var(--accent), var(--shadow); }
+.mword.right, .mpic.right { background: #dcf5d9; }
+
+.jwrap { flex: 1; display: flex; gap: 20px; align-items: center; justify-content: center; flex-wrap: wrap; min-height: 0; }
+.jboard { display: grid; gap: 4px; width: min(62vmin, 460px); aspect-ratio: 1; max-width: 100%; background: #fff; padding: 4px; border-radius: 20px; box-shadow: var(--shadow); }
+.jtile { border-radius: 8px; background-color: #eee; background-repeat: no-repeat; aspect-ratio: 1; padding: 0; }
+.jtile.sel { outline: 6px solid var(--pink); outline-offset: -6px; transform: scale(.94); }
+.jboard.solved { gap: 0; padding: 0; overflow: hidden; }
+.jboard.solved .jtile { border-radius: 0; }
+.jside { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.jpreview { width: 140px; aspect-ratio: 1; border-radius: 18px; background-size: cover; box-shadow: var(--shadow); }
+.jside .btn.sel { background: var(--accent); color: #fff; }
+
+.mgrid { flex: 1; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 12px; align-content: center; max-width: 720px; width: 100%; margin: 0 auto; }
+.mcard { position: relative; aspect-ratio: 4 / 3; border-radius: 22px; background: var(--accent); box-shadow: var(--shadow); color: #fff; perspective: 600px; padding: 0; }
+.mcard span { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 22px; backface-visibility: hidden; transition: transform .35s; }
+.mcard .back { font-size: 40px; }
+.mcard .face { background: var(--card); color: var(--ink); transform: rotateY(180deg); font-weight: 800; }
+.mcard .face.pic { font-size: clamp(36px, 8vmin, 64px); }
+.mcard .face.txt { font-size: clamp(20px, 4.5vmin, 34px); }
+.mcard.up .back { transform: rotateY(180deg); }
+.mcard.up .face { transform: rotateY(0); }
+.mcard.got .face { background: #dcf5d9; }
+
+@media (max-width: 600px) and (orientation: portrait) {
+  .slot { width: 52px; height: 60px; font-size: 36px; border-radius: 14px; }
+  .ltile { width: 58px; height: 58px; font-size: 34px; border-radius: 16px; }
+  .cwwrap { gap: 12px; --cw: clamp(36px, 11vw, 56px); }
+  .cwclues { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .cwclue { font-size: 30px; padding: 4px 12px; }
+  .mword { font-size: 22px; padding: 10px 6px; }
+  .mpic { font-size: 40px; }
+  .mwrap { gap: 14%; padding: 0; }
+  .jboard { width: min(86vw, 360px); }
+  .jside { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .jpreview { width: 70px; }
+  .mgrid { gap: 8px; }
+}
+@media (max-height: 460px) and (orientation: landscape) {
+  .slot { width: 46px; height: 52px; font-size: 30px; }
+  .ltile { width: 50px; height: 50px; font-size: 28px; box-shadow: 0 4px 0 #e0a800; }
+  .cwwrap { --cw: 36px; gap: 14px; }
+  .cwclue { font-size: 26px; padding: 2px 10px; }
+  .mword { font-size: 18px; padding: 6px; } .mpic { font-size: 34px; padding: 0; }
+  .mcol { gap: 6px; }
+  .jboard { width: min(70vh, 300px); }
+  .jpreview { width: 70px; }
+  .mgrid { max-width: 520px; gap: 8px; }
+  .mcard { aspect-ratio: 16 / 9; }
+}
