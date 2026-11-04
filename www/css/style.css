@@ -512,3 +512,8 @@ main.full { grid-template-rows: minmax(0, 1fr) !important; }
   .pzinfo b { display: none; }
   .pzbar { flex-wrap: nowrap; }
 }
+
+/* Robot cô giáo: chữ tiếng Anh nổi bật trong bong bóng */
+.bubble .enw { color: var(--accent); background: rgba(179, 136, 255, .14); padding: 0 6px; border-radius: 8px; white-space: nowrap; }
+.bubble .rpic { font-size: 1.5em; vertical-align: middle; }
+main.robotmode .bubble .en { font-weight: 700; line-height: 1.35; }
