@@ -72,12 +72,21 @@ const Voice = {
   _lastCancel: 0,
   unlocked: false,
   /* Gọi trong lúc người dùng chạm màn hình để trình duyệt cho phép phát tiếng */
-  unlock() {
-    if (Native.TTS || this.unlocked || !('speechSynthesis' in window)) return;
+  /* Phải gọi NGAY trong sự kiện chạm (không qua await): iPhone/iPad chỉ cho phát tiếng như vậy */
+  unlock(firstText, lang = 'en-US') {
+    if (Native.TTS || !('speechSynthesis' in window)) return;
+    IOSAudio.unlock();
+    if (this.unlocked) return;
     this.unlocked = true;
     try {
-      const u = new SpeechSynthesisUtterance(' ');
-      u.volume = 0; speechSynthesis.speak(u);
+      const ss = speechSynthesis;
+      this._webVoices = ss.getVoices();
+      const u = new SpeechSynthesisUtterance(firstText || ' ');
+      u.lang = lang; if (!firstText) u.volume = 0;
+      const v = this._webVoices.find(v => v.lang === lang);
+      if (v) u.voice = v;
+      this._keep.push(u);
+      ss.speak(u);
     } catch (e) {}
   },
   async _webSpeak(text, lang, pitch, rate, want) {
@@ -87,6 +96,7 @@ const Voice = {
       this._webVoices = ss.getVoices();
     }
     if (ss.speaking || ss.pending) { ss.cancel(); this._lastCancel = Date.now(); }
+    else if (Date.now() - this._lastCancel > 250) this._lastCancel = 0;
     const since = Date.now() - this._lastCancel;
     if (since < 250) await wait(250 - since);  // lỗi của Chrome: đọc ngay sau khi dừng sẽ bị mất tiếng
     try { ss.resume(); } catch (e) {}
@@ -108,9 +118,38 @@ const Voice = {
   stop() {
     FPT.stop();
     if (Native.TTS) Native.TTS.stop().catch(() => {});
-    else if ('speechSynthesis' in window) { speechSynthesis.cancel(); this._lastCancel = Date.now(); }
+    else if ('speechSynthesis' in window) {
+      // chỉ hủy khi đang đọc: hủy "suông" rồi chờ sẽ làm Safari mất quyền phát tiếng
+      if (speechSynthesis.speaking || speechSynthesis.pending) { speechSynthesis.cancel(); this._lastCancel = Date.now(); }
+    }
   }
 };
+
+/* iPhone/iPad: phát một đoạn âm thanh im lặng bằng thẻ <audio> trong lúc chạm.
+   Việc này chuyển Safari sang chế độ "phát media", giúp có tiếng cả khi gạt nút im lặng (tùy phiên bản iOS). */
+const IOSAudio = (() => {
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let el = null;
+  const silentWav = () => {
+    const n = 800, b = new Uint8Array(44 + n), d = new DataView(b.buffer);
+    const w = (o, s) => [...s].forEach((c, i) => b[o + i] = c.charCodeAt(0));
+    w(0, 'RIFF'); d.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); d.setUint32(16, 16, true); d.setUint16(20, 1, true);
+    d.setUint16(22, 1, true); d.setUint32(24, 8000, true); d.setUint32(28, 8000, true); d.setUint16(32, 1, true);
+    d.setUint16(34, 8, true); w(36, 'data'); d.setUint32(40, n, true); b.fill(128, 44);
+    let bin = ''; b.forEach(x => bin += String.fromCharCode(x));
+    return 'data:audio/wav;base64,' + btoa(bin);
+  };
+  return {
+    isIOS,
+    unlock() {
+      if (!isIOS) return;
+      try {
+        if (!el) { el = new Audio(silentWav()); el.setAttribute('playsinline', ''); el.loop = true; el.volume = 0.01; }
+        el.play().catch(() => {});
+      } catch (e) {}
+    }
+  };
+})();
 
 /* ---------- Giọng tiếng Việt vùng miền qua FPT.AI (cần API key, có Internet) ----------
    API trả về một link mp3 "async": file có sau vài giây nên phải chờ rồi mới phát. */

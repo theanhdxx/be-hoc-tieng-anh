@@ -106,7 +106,8 @@ const Run = { id: 0, name: '', age: '' };
 const SCREENS = {};
 let current = 'home';
 
-function go(name, params = {}, push = true) {
+function go(name, params = {}, push = true, extra = {}) {
+  Run.extra = extra;
   Run.id++;
   Voice.stop(); Ears.stop();
   Stage.talking(false); Stage.mood(null); Stage.bubble('');
@@ -187,7 +188,11 @@ SCREENS.home = {
       `<button class="tile ${TILE_COLORS[i % 6]}" data-go="${x[0]}"><span class="ico">${x[1]}</span>${x[2]}<small>${x[3]}</small></button>`).join('')}</div>`;
     $$('[data-go]', p).forEach(b => b.onclick = () => { Sfx.tap(); go(b.dataset.go); });
     const nm = S.childName ? `, ${S.childName}` : '';
-    talk(`Hi${nm}! Let's play!`, 'Chào bé! Mình cùng chơi nhé!');
+    if (Run.extra && Run.extra.silent) Stage.bubble("Hi! Let's play!", 'Chào bé! Mình cùng chơi nhé!');
+    else if (Run.extra && Run.extra.greeted) {           // câu chào đã được đọc lúc bấm Bắt đầu
+      Stage.bubble(Run.extra.greeted, 'Chào bé! Mình cùng chơi nhé!');
+      Stage.talking(true); setTimeout(() => Stage.talking(false), 1600);
+    } else talk(`Hi${nm}! Let's play!`, 'Chào bé! Mình cùng chơi nhé!');
   }
 };
 
@@ -939,15 +944,20 @@ SCREENS.settings = {
   history.replaceState({ name: 'home', params: {} }, '');
   if (Native.isNative) { go('home', {}, false); return; }
   // Bản web: trình duyệt chỉ cho phát tiếng sau khi chạm màn hình → nút Bắt đầu
-  go('home', {}, false);
-  Voice.stop();
+  go('home', {}, false, { silent: true });   // chưa đọc gì cho đến khi bé bấm Bắt đầu
   const ov = document.createElement('div');
   ov.className = 'startov';
   ov.innerHTML = `<button class="btn big primary" id="startBtn">▶️ Bắt đầu</button><div class="mic-label">Chạm để bật tiếng</div>`;
   document.body.appendChild(ov);
   $('#startBtn').onclick = () => {
-    Voice.unlock(); Sfx.unlock(); Sfx.pop();
+    Sfx.unlock();
+    // câu chào đầu tiên được đọc ngay trong lần chạm này (bắt buộc với Safari trên iPhone)
+    const hi = `Hi${S.childName ? ', ' + S.childName : ''}! Let's play!`;
+    Voice.unlock(hi);
+    Sfx.pop();
     ov.remove();
-    go('home', {}, false);
+    go('home', {}, false, { greeted: hi });
   };
+  // mỗi lần chạm đều "giữ ấm" quyền phát tiếng trên iPhone
+  document.addEventListener('touchend', () => { if (IOSAudio.isIOS) { Sfx.unlock(); IOSAudio.unlock(); } }, { passive: true });
 })();
