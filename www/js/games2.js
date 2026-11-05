@@ -108,9 +108,10 @@ GAME_IMPL.path = (p, pr) => {
 /* ---------- 2. BẮN TRỨNG: chạm để bắn quả trứng có chữ/số đúng ---------- */
 GAME_IMPL.eggs = (p, pr) => {
   let mode = pr.mode || 'abc';
-  const ROUNDS = 10;
+  const WORD = mode === 'word';                            // chế độ ghép từ: bắn lần lượt từng chữ của từ
+  const ROUNDS = WORD ? 5 : 10;
   p.innerHTML = `<div class="eggbar">
-      <div class="row tabs pzlv">${[['abc', '🔤 Chữ cái'], ['123', '🔢 Chữ số'], ['mix', '🎲 Cả hai']].map(([m, t]) => `<button class="btn ${m === mode ? 'sel' : ''}" data-m="${m}">${t}</button>`).join('')}</div>
+      <div class="row tabs pzlv">${[['abc', '🔤 Chữ cái'], ['123', '🔢 Chữ số'], ['mix', '🎲 Cả hai'], ['word', '🧩 Ghép từ']].map(([m, t]) => `<button class="btn ${m === mode ? 'sel' : ''}" data-m="${m}">${t}</button>`).join('')}</div>
       <div class="eggtarget" id="etgt"></div>
       <button class="btn" id="esay">🔊 Nghe lại</button>
     </div>
@@ -120,7 +121,9 @@ GAME_IMPL.eggs = (p, pr) => {
 
   const area = $('#earea', p), cv = $('#ecv', p), ctx = cv.getContext('2d');
   const token = Run.id;
-  const pool = mode === 'abc' ? LETTERS : mode === '123' ? DIGITS : LETTERS.concat(DIGITS);
+  const pool = mode === 'abc' || WORD ? LETTERS : mode === '123' ? DIGITS : LETTERS.concat(DIGITS);
+  const wordPool = shuffle(GAME_WORDS.filter(w => /^[a-z]+$/.test(w[0]) && w[0].length <= Math.max(3, maxLen())));
+  let word = null, pos = 0, wi = 0;
   const show = c => (/\d/.test(c) || !S.lowerCase) ? c : c.toLowerCase();
   const nameOf = c => /\d/.test(c) ? NUMBER_WORDS[+c] : c;
   const EGG_COLORS = ['#fff3e0', '#e1f5fe', '#fce4ec', '#f1f8e9', '#ede7f6', '#fffde7'];
@@ -148,7 +151,39 @@ GAME_IMPL.eggs = (p, pr) => {
     return { label, lane, x, y: laneY(lane), baseY: laneY(lane), vx: laneV(lane), t: Math.random() * 6, r,
       color: pick(EGG_COLORS), spot: pick(SPOTS), falling: false, vy: 0, rot: 0, vr: 0, crack: 0 };
   };
+  /* --- chế độ ghép từ --- */
+  const wordHUD = () => {
+    const hint = S.childAge <= 4;                           // bé nhỏ: hiện mờ chữ cần bắn
+    $('#etgt', p).innerHTML = `<span class="eword-pic">${word[1]}</span>` + word[0].toUpperCase().split('').map((c, i) =>
+      `<span class="eslot ${i < pos ? 'filled' : i === pos ? 'now' : ''}">${i < pos ? show(c) : (hint ? `<i>${show(c)}</i>` : '')}</span>`).join('');
+  };
+  const sayWord = () => talk(`Let's spell ${word[0]}! ${spellOut(word[0])}.`, `Bé bắn lần lượt các chữ để ghép thành từ ${word[0]} — ${word[2]} nhé!`);
+  // trên màn hình luôn có chữ cần bắn; các chữ còn thiếu của từ + vài chữ khác
+  const fillEggs = () => {
+    const alive = eggs.filter(e => !e.falling);
+    const need = word[0].toUpperCase().slice(pos).split('');
+    if (!alive.some(e => e.label === target)) eggs.push(spawn(target));
+    while (eggs.filter(e => !e.falling).length < N_EGGS()) {
+      const have = eggs.filter(e => !e.falling).map(e => e.label);
+      const missing = need.filter(c => !have.includes(c));
+      let l = missing.length && Math.random() < .6 ? pick(missing) : pick(pool);
+      if (have.includes(l) && !missing.includes(l)) continue;
+      eggs.push(spawn(l));
+    }
+  };
+  const newWord = () => {
+    if (score >= ROUNDS) return finish();
+    word = wordPool[wi++ % wordPool.length]; pos = 0;
+    target = word[0][0].toUpperCase();
+    const letters = new Set(word[0].toUpperCase().split(''));
+    while (letters.size < N_EGGS()) letters.add(pick(pool));
+    const per = Math.ceil(N_EGGS() / LANES);
+    eggs = shuffle([...letters].slice(0, Math.max(N_EGGS(), letters.size))).map((l, i) => spawn(l, i % LANES, Math.floor(i / LANES), per));
+    wordHUD(); sayWord();
+  };
+
   const newTarget = () => {
+    if (WORD) return newWord();
     if (score >= ROUNDS) return finish();
     let t; do { t = pick(pool); } while (target && t === target);
     target = t;
@@ -161,7 +196,11 @@ GAME_IMPL.eggs = (p, pr) => {
     $('#etgt', p).innerHTML = `Bắn <b>${show(t)}</b>`;
     talk(/\d/.test(t) ? `Shoot number ${nameOf(t)}!` : `Shoot the letter ${t}!`, `Bắn quả trứng có ${/\d/.test(t) ? 'số' : 'chữ'} ${show(t)} nhé!`);
   };
-  $('#esay', p).onclick = () => target && talk(/\d/.test(target) ? `Shoot number ${nameOf(target)}!` : `Shoot the letter ${target}!`);
+  $('#esay', p).onclick = () => {
+    if (!target) return;
+    if (WORD) return talk(`${word[0]}. Shoot the letter ${target}!`, `Bắn chữ ${show(target)} nhé!`);
+    talk(/\d/.test(target) ? `Shoot number ${nameOf(target)}!` : `Shoot the letter ${target}!`);
+  };
 
   /* --- vẽ --- */
   const drawEgg = e => {
@@ -227,6 +266,22 @@ GAME_IMPL.eggs = (p, pr) => {
     e.falling = true; e.crack = 1; e.vy = -220; e.vr = (Math.random() - .5) * 6;
     Sfx.pop();
     for (let i = 0; i < 6; i++) bits.push({ ch: i % 2 ? '✨' : '🥚', x: e.x + (Math.random() - .5) * e.r, y: e.y, vy: -200 - Math.random() * 200, life: 1, size: 18 + Math.random() * 14 });
+    if (WORD && e.label === target) {                     // đúng chữ tiếp theo của từ
+      pos++; Sfx.ding();
+      bits.push({ ch: '🐣', x: e.x, y: e.y, vy: -320, life: 1.4, size: 52 });
+      if (pos >= word[0].length) {
+        lock = true; wordHUD();
+        score++; addStar(2);
+        const dots = $$('#eprog i', p); dots.forEach((d, k) => d.className = k < score ? 'done' : k === score ? 'now' : '');
+        if (!(await celebrate(`${spellOut(word[0])}. ${word[0]}!`, `${word[0]} là ${word[2]}. Bé giỏi quá!`))) return;
+        if (token !== Run.id) return;
+        lock = false; return newTarget();
+      }
+      target = word[0][pos].toUpperCase();
+      wordHUD(); fillEggs();
+      Voice.stop(); Voice.speak(e.label, 'en-US', char().pitch, S.rate);
+      return;
+    }
     if (e.label === target) {
       lock = true;
       score++; addStar();
@@ -241,6 +296,7 @@ GAME_IMPL.eggs = (p, pr) => {
       talk(`That is ${nameOf(e.label)}. Find ${nameOf(target)}!`, null, { noVi: true });
       setTimeout(() => {
         if (token !== Run.id) return;
+        if (WORD) return fillEggs();
         let l; do { l = pick(pool); } while (eggs.some(x => !x.falling && x.label === l));
         eggs.push(spawn(l));
       }, 900);

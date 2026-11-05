@@ -547,3 +547,18 @@ main.robotmode .bubble .en { font-weight: 700; line-height: 1.35; }
   .eggtarget { font-size: 16px; } .eggtarget b { font-size: 28px; }
   .eggbar .btn { font-size: 13px; padding: 5px 9px; }
 }
+
+/* Bắn trứng — ghép từ */
+.eggtarget .eword-pic { font-size: 40px; vertical-align: middle; margin-right: 8px; }
+.eslot { display: inline-grid; place-items: center; width: 44px; height: 50px; margin: 0 3px; border-radius: 12px; border: 3px dashed #c9bfe6; background: rgba(255,255,255,.7); vertical-align: middle; font-size: 32px; color: var(--ink); }
+.eslot i { font-style: normal; opacity: .25; }
+.eslot.now { border: 3px solid var(--pink); animation: pulse 1s infinite; }
+.eslot.filled { border: 3px solid var(--green); background: #fff; animation: popin .3s; }
+@media (max-width: 600px) and (orientation: portrait) {
+  .eggtarget .eword-pic { font-size: 28px; margin-right: 4px; }
+  .eslot { width: 30px; height: 36px; font-size: 22px; margin: 0 1px; border-radius: 9px; }
+}
+@media (max-height: 460px) and (orientation: landscape) {
+  .eslot { width: 30px; height: 34px; font-size: 22px; }
+  .eggtarget .eword-pic { font-size: 26px; }
+}
