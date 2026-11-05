@@ -29,13 +29,7 @@ const Voice = {
     const vs = (typeof S !== 'undefined' && S.voice) || {};
     const isVi = lang.startsWith('vi');
     if (isVi && !opts.device && FPT.ready()) return FPT.speak(text).catch(e => { console.warn('FPT:', e.message); return this.speak(text, lang, pitch, rate, { device: true }); });
-    // Kiểu giọng: nữ / nam / trẻ em (chỉnh cao độ trên giọng của máy)
-    if (isVi && !opts.keepRate) rate = (typeof S !== 'undefined' && S.viRate) || 0.8;
-    const st = isVi ? vs.viStyle : vs.enStyle;
-    if (st === 'female') pitch = 1.15;
-    else if (st === 'male') pitch = 0.72;
-    else if (st === 'child') { pitch = 1.75; rate *= 1.06; }
-    if (opts.pitch) pitch = opts.pitch;
+    ({ pitch, rate } = this._prep(lang, pitch, rate, opts));
     const want = opts.voiceName != null ? opts.voiceName : (isVi ? vs.viVoice : vs.enVoice);
     if (Native.TTS) {
       const o = { text, lang, rate, pitch, volume: 1.0, category: 'playback' };
@@ -45,6 +39,59 @@ const Voice = {
     }
     if (!('speechSynthesis' in window)) return wait(Math.min(4000, text.length * 70));
     return this._webSpeak(text, lang, pitch, rate, want);
+  },
+  /* Kiểu giọng: nữ / nam / trẻ em (chỉnh cao độ) + tốc độ riêng cho tiếng Việt */
+  _prep(lang, pitch, rate, opts = {}) {
+    const vs = (typeof S !== 'undefined' && S.voice) || {};
+    const isVi = lang.startsWith('vi');
+    if (isVi && !opts.keepRate) rate = (typeof S !== 'undefined' && S.viRate) || 0.8;
+    const st = isVi ? vs.viStyle : vs.enStyle;
+    if (st === 'female') pitch = 1.15;
+    else if (st === 'male') pitch = 0.72;
+    else if (st === 'child') { pitch = 1.75; rate *= 1.06; }
+    if (opts.pitch) pitch = opts.pitch;
+    return { pitch, rate };
+  },
+  /* Đọc liền một loạt câu (Anh/Việt xen kẽ) không có khoảng chờ giữa các câu:
+     xếp hàng tất cả vào bộ đọc của máy cùng lúc. Trả về false nếu phải đọc từng câu (đang dùng giọng FPT). */
+  speakQueue(items) {
+    if (!items.length) return Promise.resolve(true);
+    if (items.some(it => it.lang.startsWith('vi')) && FPT.ready()) return Promise.resolve(false);
+    const vs = (typeof S !== 'undefined' && S.voice) || {};
+    const prepped = items.map(it => ({ ...it, ...this._prep(it.lang, it.pitch, it.rate), want: it.lang.startsWith('vi') ? vs.viVoice : vs.enVoice }));
+    if (Native.TTS) {
+      return Promise.all(prepped.map((it, i) => {
+        const o = { text: it.text, lang: it.lang, rate: it.rate, pitch: it.pitch, volume: 1.0, category: 'playback', queueStrategy: i ? 1 : 0 };
+        const idx = it.want ? this._nativeVoices.findIndex(v => v.name === it.want || v.voiceURI === it.want) : -1;
+        if (idx >= 0) o.voice = idx;
+        return Native.TTS.speak(o).catch(() => {});
+      })).then(() => true);
+    }
+    if (!('speechSynthesis' in window)) return wait(1500).then(() => true);
+    return (async () => {
+      const ss = window.speechSynthesis;
+      if (!this._webVoices.length) { for (let i = 0; i < 10 && !ss.getVoices().length; i++) await wait(100); this._webVoices = ss.getVoices(); }
+      if (ss.speaking || ss.pending) { ss.cancel(); await wait(250); }
+      try { ss.resume(); } catch (e) {}
+      const total = prepped.reduce((n, it) => n + it.text.length * 45 / Math.max(.5, it.rate), 0);
+      return new Promise(res => {
+        const t0 = Date.now();
+        let done = false, ended = false;
+        const finish = () => { if (!done) { done = true; clearInterval(poll); res(true); } };
+        const poll = setInterval(() => { if (ended && Date.now() - t0 >= Math.min(12000, total) && !ss.speaking && !ss.pending) finish(); }, 100);
+        setTimeout(finish, 5000 + total * 3);
+        prepped.forEach((it, i) => {
+          const u = new SpeechSynthesisUtterance(it.text);
+          u.lang = it.lang; u.pitch = Math.min(2, it.pitch); u.rate = it.rate; u.volume = 1;
+          const v = (it.want && this._webVoices.find(v => v.name === it.want || v.voiceURI === it.want)) ||
+            this._webVoices.find(v => v.lang === it.lang) || this._webVoices.find(v => v.lang && v.lang.replace('_', '-').startsWith(it.lang.slice(0, 2)));
+          if (v) u.voice = v;
+          this._keep.push(u); if (this._keep.length > 30) this._keep.shift();
+          if (i === prepped.length - 1) { u.onend = () => { ended = true; }; u.onerror = e => { if (e && (e.error === 'interrupted' || e.error === 'canceled')) finish(); else ended = true; }; }
+          ss.speak(u);
+        });
+      });
+    })();
   },
   /* Chờ đến khi máy thật sự đọc xong (Safari có thể còn đọc dù đã báo xong), rồi nghỉ một nhịp */
   async idle(gap = 350) {
@@ -285,13 +332,35 @@ const Ears = {
     } catch (e) { return false; }
   },
   /* Nghe 1 câu, trả về mảng các câu đoán được (chữ thường) */
-  async listen(lang = 'en-US', timeoutMs = 9000) {
+  /* Gọi ngay trong lúc chạm màn hình: xin quyền micro sẵn (Safari/Chrome cần thao tác chạm cho lần đầu) */
+  prime() {
+    if (!this.available) return;
+    if (Native.SR) { this.ensurePermission(); return; }
+    const W = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!W || this._primed) return;
+    this._primed = true;
+    try {
+      const r = new W(); r.lang = 'en-US';
+      r.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') this.blocked = true; };
+      r.onend = () => {}; r.start();
+      setTimeout(() => { try { r.abort(); } catch (e) {} }, 150);
+    } catch (e) {}
+  },
+  /* Nghe 1 câu, trả về mảng các câu đoán được (chữ thường).
+     opts.early(matches) → true: dừng nghe ngay (bé đã nói đúng đáp án)
+     opts.quietMs: bé ngừng nói bao lâu thì coi như xong (nhanh hơn chờ máy tự kết thúc) */
+  async listen(lang = 'en-US', timeoutMs = 9000, opts = {}) {
     if (!this.available) return [];
     Voice.stop();
     this._listening = true;
+    const quietMs = opts.quietMs || 900, early = opts.early;
     try {
       if (Native.SR) {
         if (!(await this.ensurePermission())) return [];
+        if (this._partialOK !== false) {
+          try { return await this._nativePartial(lang, timeoutMs, quietMs, early); }
+          catch (e) { this._partialOK = false; }      // máy không hỗ trợ → dùng cách thường
+        }
         const t = setTimeout(() => Native.SR.stop().catch(() => {}), timeoutMs);
         try {
           const r = await Native.SR.start({ language: lang, maxResults: 5, partialResults: false, popup: false });
@@ -302,12 +371,21 @@ const Ears = {
       return await new Promise(res => {
         const rec = new W();
         this._web = rec;
-        rec.lang = lang; rec.maxAlternatives = 5; rec.interimResults = false; rec.continuous = false;
-        let out = [];
-        rec.onresult = e => { out = Array.from(e.results[0]).map(a => a.transcript.toLowerCase()); };
-        rec.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') this.blocked = true; res(out); };
-        rec.onend = () => res(out);
-        setTimeout(() => { try { rec.stop(); } catch (e) {} }, timeoutMs);
+        rec.lang = lang; rec.maxAlternatives = 5; rec.interimResults = true; rec.continuous = false;
+        let out = [], last = 0, done = false;
+        const stop = () => { try { rec.stop(); } catch (e) {} };
+        const fin = () => { if (!done) { done = true; clearInterval(q); clearTimeout(to); res(out); } };
+        rec.onresult = e => {
+          const r = e.results[e.results.length - 1];
+          const best = Array.from(e.results).map(x => x[0].transcript).join(' ').trim().toLowerCase();
+          out = r.isFinal ? [best, ...Array.from(r).slice(1).map(a => a.transcript.toLowerCase())] : [best];
+          last = Date.now();
+          if (early && early(out)) stop();
+        };
+        rec.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') this.blocked = true; fin(); };
+        rec.onend = fin;
+        const q = setInterval(() => { if (last && Date.now() - last > quietMs) stop(); }, 120);
+        const to = setTimeout(stop, timeoutMs);
         rec.start();
       });
     } catch (e) {
@@ -315,6 +393,33 @@ const Ears = {
     } finally {
       this._listening = false;
     }
+  },
+  /* Android: nhận kết quả từng phần để phản hồi ngay, không chờ máy tự kết thúc */
+  async _nativePartial(lang, timeoutMs, quietMs, early) {
+    const SR = Native.SR;
+    let latest = [], last = 0, done = false, started = Date.now();
+    const hs = [];
+    return new Promise(async (res, rej) => {
+      const fin = () => {
+        if (done) return; done = true;
+        clearInterval(q); clearTimeout(to);
+        SR.stop().catch(() => {});
+        hs.forEach(h => h && h.remove && h.remove());
+        res(latest);
+      };
+      try {
+        hs.push(await SR.addListener('partialResults', d => {
+          const m = (d.matches || []).map(x => String(x).toLowerCase()).filter(Boolean);
+          if (m.length) { latest = m; last = Date.now(); }
+          if (early && latest.length && early(latest)) fin();
+        }));
+        hs.push(await SR.addListener('listeningState', d => { if (d.status === 'stopped') setTimeout(fin, 200); }));
+      } catch (e) { return rej(e); }
+      const q = setInterval(() => { if (last && Date.now() - last > quietMs) fin(); }, 120);
+      const to = setTimeout(fin, timeoutMs);
+      try { await SR.start({ language: lang, maxResults: 5, partialResults: true, popup: false }); }
+      catch (e) { if (Date.now() - started < 300 && !latest.length) { done = true; clearInterval(q); clearTimeout(to); hs.forEach(h => h && h.remove && h.remove()); rej(e); } else fin(); }
+    });
   },
   stop() {
     if (!this._listening) return;

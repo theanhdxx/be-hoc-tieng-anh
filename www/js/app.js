@@ -122,7 +122,7 @@ function go(name, params = {}, push = true, extra = {}) {
   const ce = $('#charEl'); if (ce) ce.classList.remove('sleeping');
   $('#title').textContent = sc.title(params);
   $('#back').classList.toggle('hidden', name === 'home');
-  $('#main').classList.toggle('full', !!sc.full);
+  $('#main').classList.toggle('full', !!(typeof sc.full === 'function' ? sc.full(params) : sc.full));
   const panel = $('#panel'); panel.innerHTML = ''; panel.scrollTop = 0;
   if (push) history.pushState({ name, params }, '');
   sc.render(panel, params);

@@ -25,7 +25,9 @@ const GAMES = [
   ['match', '🔗', 'Nối từ với hình', 'Match'],
   ['jigsaw', '🧩', 'Ghép tranh', 'Puzzle'],
   ['memory', '🃏', 'Lật hình', 'Memory'],
-  ['puzzle', '🖼️', 'Ghép hình 20–50 mảnh', 'Jigsaw']
+  ['puzzle', '🖼️', 'Ghép hình 20–50 mảnh', 'Jigsaw'],
+  ['path', '🧶', 'Tìm đường đi', 'Follow the lines'],
+  ['eggs', '🥚', 'Bắn trứng', 'Egg shooter']
 ];
 
 /* Độ dài từ theo tuổi */
@@ -59,6 +61,7 @@ SCREENS.games = {
 
 SCREENS.game = {
   title: pr => { const g = GAMES.find(x => x[0] === pr.g); return `${g[1]} ${g[2]}`; },
+  full: pr => ['path', 'eggs'].includes(pr.g),
   render(p, pr) { GAME_IMPL[pr.g](p, pr); }
 };
 

@@ -517,3 +517,33 @@ main.full { grid-template-rows: minmax(0, 1fr) !important; }
 .bubble .enw { color: var(--accent); background: rgba(179, 136, 255, .14); padding: 0 6px; border-radius: 8px; white-space: nowrap; }
 .bubble .rpic { font-size: 1.5em; vertical-align: middle; }
 main.robotmode .bubble .en { font-weight: 700; line-height: 1.35; }
+.rauto { border: 0; font-family: inherit; font-weight: 800; cursor: pointer; color: var(--ink); }
+.rauto.off { background: #ffe0e0; }
+
+/* ================== TÌM ĐƯỜNG ĐI ================== */
+.pathwrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.55); border-radius: 26px; padding: 6px; }
+.pathsvg { width: 100%; height: 100%; max-height: 100%; }
+.rope { fill: none; stroke-width: 12; stroke-linecap: round; opacity: .9; }
+.rope-glow { fill: none; stroke-width: 16; stroke-linecap: round; pointer-events: none; filter: drop-shadow(0 0 6px rgba(255,255,255,.9)); }
+.rope-glow.keep { opacity: .9; }
+.pnode { cursor: pointer; }
+.pnode circle { fill: var(--card); stroke: #d9cfee; stroke-width: 6; transition: stroke .2s; }
+.pnode text { font-size: 64px; text-anchor: middle; }
+.pnode.sel circle { stroke: var(--pink); stroke-width: 10; }
+.pnode.done circle { fill: #dcf5d9; stroke: var(--green); }
+.pnode.wrong > g { animation: shake .4s; }
+
+/* ================== BẮN TRỨNG ================== */
+.eggbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: space-between; }
+.eggtarget { font-size: 26px; font-weight: 800; background: var(--card); border-radius: 22px; padding: 4px 20px; box-shadow: var(--shadow); }
+.eggtarget b { font-size: 44px; color: var(--pink); vertical-align: middle; margin-left: 6px; }
+.eggarea { position: relative; flex: 1; min-height: 240px; border-radius: 26px; background: linear-gradient(#bfe8ff, #e8f7ff); overflow: hidden; touch-action: none; cursor: crosshair; }
+.eggarea canvas { position: absolute; inset: 0; }
+@media (max-width: 600px) and (orientation: portrait) {
+  .eggtarget { font-size: 18px; padding: 2px 12px; } .eggtarget b { font-size: 32px; }
+  .eggbar .btn { font-size: 13px; padding: 6px 9px; }
+}
+@media (max-height: 460px) and (orientation: landscape) {
+  .eggtarget { font-size: 16px; } .eggtarget b { font-size: 28px; }
+  .eggbar .btn { font-size: 13px; padding: 5px 9px; }
+}
